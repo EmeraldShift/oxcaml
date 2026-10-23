@@ -774,6 +774,9 @@ let file_emitter ~file_num ~file_name =
 let emit_debug_info ?discriminator dbg =
   Emitaux.emit_debug_info_gen ?discriminator dbg file_emitter D.loc
 
+let emit_function_start_debug_info dbg =
+  Emitaux.emit_function_start_debug_info_gen dbg file_emitter D.loc
+
 (* Record calls to the GC -- we've moved them out of the way *)
 
 let emit_call_gc gc =
@@ -2235,7 +2238,7 @@ let fundecl fundecl =
      way. Local references use the label form to avoid ELF visibility issues. *)
   D.define_joint_label_and_symbol ~section:Text fun_sym;
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
-  emit_debug_info fundecl.fun_dbg;
+  emit_function_start_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc_sites = relax_branches env fundecl.fun_body in
   emit_all env fundecl.fun_body;

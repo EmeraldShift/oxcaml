@@ -36,6 +36,14 @@ val emit_debug_info_gen :
   (file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit) ->
   unit
 
+(** Like [emit_debug_info_gen], for a function's first instruction. When emitting
+    DWARF and [dbg] has no line, emits a row with line 0. *)
+val emit_function_start_debug_info_gen :
+  Debuginfo.t ->
+  (file_num:int -> file_name:string -> unit) ->
+  (file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit) ->
+  unit
+
 type frame_debuginfo =
   | Dbg_alloc of Cmm.alloc_dbginfo
   | Dbg_raise of Debuginfo.t

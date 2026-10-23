@@ -1,0 +1,17 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+${program}
+
+# For each function, print the line of the last .loc before its first
+# instruction. Strip numeric suffixes from the symbol names.
+asm=${test_build_directory}/function_start_rows.s
+awk '
+  /^caml.*(_code|__entry|__probe_wrapper_[0-9]+):$/ {
+    fn = substr($0, 1, length($0) - 1); line = "none"; next
+  }
+  fn != "" && $1 == ".loc" { line = $3; next }
+  fn != "" && /^\t[a-z]/ { print fn, line; fn = "" }
+' "$asm" \
+  | sed -E 's/(_[0-9]+)+_code /_code /; s/probe_wrapper_[0-9]+/probe_wrapper/'

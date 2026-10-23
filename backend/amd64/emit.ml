@@ -221,6 +221,9 @@ let file_emitter ~file_num ~file_name =
 let emit_debug_info ?discriminator dbg =
   emit_debug_info_gen ?discriminator dbg file_emitter D.loc
 
+let emit_function_start_debug_info dbg =
+  emit_function_start_debug_info_gen dbg file_emitter D.loc
+
 let emit_debug_info_linear i =
   match i.fdo with
   | None -> emit_debug_info i.dbg
@@ -2876,7 +2879,7 @@ let fundecl fundecl =
          ...
   *)
   D.define_joint_label_and_symbol ~section:Text fundecl_sym;
-  emit_debug_info fundecl.fun_dbg;
+  emit_function_start_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
   if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
@@ -3132,6 +3135,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   emit_named_text_section (S.encode wrap_label);
   D.align ~fill:Nop ~bytes:16;
   D.define_symbol_label ~section:Text wrap_label;
+  emit_function_start_debug_info p.probe_insn.dbg;
   D.cfi_startproc ();
   if fp
   then (

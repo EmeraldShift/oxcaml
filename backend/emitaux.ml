@@ -659,23 +659,26 @@ let register_primary_file ~file_emitter ~sourcefile =
     file_emitter ~file_num:0 ~file_name:sourcefile;
     file_pos_nums := (sourcefile, 0) :: !file_pos_nums)
 
+(* Returns the innermost item of [dbg] if it has a line. *)
+let innermost_item_with_line dbg =
+  match List.rev (Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg)) with
+  | [] -> None
+  | item :: _ -> if item.Debuginfo.dinfo_line > 0 then Some item else None
+
 (* We only display .file if the file has not been seen before. We display .loc
-   for every instruction. *)
+   for every instruction that has a line. An instruction without a line stays in
+   the row of the instruction before it. *)
 let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
-  let dbg = Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg) in
   if is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
   then
-    match List.rev dbg with
-    | [] -> ()
-    | ({ Debuginfo.dinfo_line = line; dinfo_char_start = col; _ } as item) :: _
+    match innermost_item_with_line dbg with
+    | None -> ()
+    | Some ({ Debuginfo.dinfo_line = line; dinfo_char_start = col; _ } as item)
       ->
-      if line > 0
-      then
-        (* PR#6243 *)
-        let file_num =
-          get_file_num ~file_emitter (Debuginfo.item_file_path item)
-        in
-        loc_emitter ~file_num ~line ~col ?discriminator ()
+      let file_num =
+        get_file_num ~file_emitter (Debuginfo.item_file_path item)
+      in
+      loc_emitter ~file_num ~line ~col ?discriminator ()
 
 let binary_backend_available = ref false
 
@@ -775,6 +778,23 @@ module Dwarf_helpers = struct
       let ppf_dump = !ppf_dump in
       Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
+
+(* At a function's start, the row before usually belongs to the previous
+   function. So when [dbg] has no line, we emit a row with line 0 in the
+   compilation unit's source file. DWARF uses line 0 for code with no source
+   line. We only know the source file when emitting DWARF. *)
+let emit_function_start_debug_info_gen dbg file_emitter
+    (loc_emitter :
+      file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit)
+    =
+  match innermost_item_with_line dbg, !Dwarf_helpers.sourcefile_for_dwarf with
+  | Some _, _ -> emit_debug_info_gen dbg file_emitter loc_emitter
+  | None, None -> ()
+  | None, Some sourcefile ->
+    if is_cfi_enabled ()
+    then
+      let file_num = get_file_num ~file_emitter sourcefile in
+      loc_emitter ~file_num ~line:0 ~col:0 ()
 
 let report_error_doc ppf = function
   | Stack_frame_too_large n ->
